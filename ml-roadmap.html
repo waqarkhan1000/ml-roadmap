@@ -8,4 +8,824 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-…</html>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .nav-link.active {
+            background-color: #2563EB; /* blue-600 */
+            color: white;
+        }
+        .nav-link {
+            transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+        }
+        .nav-link:hover {
+            transform: translateY(-2px);
+        }
+        .week-header {
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .week-header:hover {
+            background-color: #F3F4F6; /* gray-100 */
+            transform: translateY(-1px);
+        }
+        .week-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out, padding 0.5s ease-out;
+        }
+        .week-content.expanded {
+            max-height: 2000px; /* Arbitrary large value to allow content to expand */
+            padding-bottom: 1rem;
+            padding-top: 1rem;
+        }
+        .arrow-icon {
+            transition: transform 0.3s ease;
+        }
+        .arrow-icon.rotated {
+            transform: rotate(90deg);
+        }
+        /* Chart container styling as per requirements, though not actively used in this specific SPA */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px; /* Example max-width */
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px; /* Base height, can be responsive with Tailwind */
+            max-height: 400px; /* Example max-height */
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .prose-custom ul { list-style-type: disc; margin-left: 1.5rem; }
+        .prose-custom li { margin-bottom: 0.5rem; }
+        .prose-custom a { color: #3B82F6; text-decoration: underline; } /* blue-500 */
+        .prose-custom a:hover { color: #2563EB; } /* blue-600 */
+        .prose-custom h3 { margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 600; color: #1E40AF; } /* blue-800 */
+        .prose-custom h4 { margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1.125rem; font-weight: 600; color: #1D4ED8; } /* blue-700 */
+
+        #scroll-to-top {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background-color: #3B82F6;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 9999px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease, opacity 0.3s ease;
+            z-index: 1000;
+        }
+        #scroll-to-top:hover {
+            background-color: #2563EB;
+        }
+
+        /* General Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #333;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .llm-loading {
+            text-align: center;
+            font-style: italic;
+            color: #6B7280; /* gray-500 */
+        }
+        .video-thumbnail-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+        }
+        .video-thumbnail-container img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s ease-in-out;
+        }
+        .video-thumbnail-container:hover img {
+            transform: scale(1.05);
+        }
+        .video-play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            pointer-events: none; /* Allows clicks to pass through to the container */
+            transition: color 0.2s ease-in-out;
+        }
+        .video-thumbnail-container:hover .video-play-icon {
+            color: rgba(255, 255, 255, 1);
+        }
+        .video-modal-content {
+            padding: 0; /* Remove padding for iframe */
+            max-width: 900px; /* Larger max-width for video */
+            width: 90%;
+            height: 70vh; /* Fixed height for video modal */
+            display: flex;
+            flex-direction: column;
+        }
+        .video-modal-content iframe {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+        .video-modal-content .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            line-height: 1;
+            padding: 0;
+            z-index: 10001;
+        }
+        .video-modal-content .close-button:hover {
+            background-color: rgba(0,0,0,0.7);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-blue-700 mb-2">4-Month Machine Learning Engineer Roadmap</h1>
+            <p class="text-gray-600 mt-2 text-lg">An interactive guide to your ML journey from fundamentals to job landing.</p>
+            <button id="shareAppBtn" class="mt-4 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors duration-200 shadow">
+                Share This Roadmap
+            </button>
+        </header>
+
+        <nav class="mb-8 bg-white p-2 rounded-xl shadow-lg border border-gray-200">
+            <ul class="flex flex-wrap justify-center gap-2">
+                <li><button data-tab="month1" class="nav-link active w-full sm:w-auto text-sm sm:text-base px-4 py-2 rounded-lg font-medium text-blue-700 hover:bg-blue-500 hover:text-white shadow-sm">Month 1</button></li>
+                <li><button data-tab="month2" class="nav-link w-full sm:w-auto text-sm sm:text-base px-4 py-2 rounded-lg font-medium text-blue-700 hover:bg-blue-500 hover:text-white shadow-sm">Month 2</button></li>
+                <li><button data-tab="month3" class="nav-link w-full sm:w-auto text-sm sm:text-base px-4 py-2 rounded-lg font-medium text-blue-700 hover:bg-blue-500 hover:text-white shadow-sm">Month 3</button></li>
+                <li><button data-tab="month4" class="nav-link w-full sm:w-auto text-sm sm:text-base px-4 py-2 rounded-lg font-medium text-blue-700 hover:bg-blue-500 hover:text-white shadow-sm">Month 4</button></li>
+                <li><button data-tab="tips" class="nav-link w-full sm:w-auto text-sm sm:text-base px-4 py-2 rounded-lg font-medium text-blue-700 hover:bg-blue-500 hover:text-white shadow-sm">General Tips</button></li>
+            </ul>
+        </nav>
+
+        <main id="roadmap-content" class="bg-white p-4 sm:p-6 rounded-xl shadow-lg border border-gray-200 prose-custom">
+            </main>
+
+        <button id="scroll-to-top" aria-label="Scroll to top">
+            ↑ Top
+        </button>
+
+        <div id="explanationModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-button">×</span>
+                <h3 class="text-xl font-semibold text-blue-700 mb-4" id="modalTitle">Explanation</h3>
+                <div id="modalExplanationContent" class="text-gray-700">
+                    <p class="llm-loading">Generating explanation...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="videoModal" class="modal hidden">
+            <div class="modal-content video-modal-content">
+                <span class="close-button" id="closeVideoModal">×</span>
+                <iframe id="youtubePlayer" width="560" height="315" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+        </div>
+
+        <div id="shareModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-button" id="closeShareModal">×</span>
+                <h3 class="text-xl font-semibold text-blue-700 mb-4">How to Share This Roadmap</h3>
+                <div class="text-gray-700 space-y-4">
+                    <p>This interactive roadmap is currently running directly in your browser from a local file. To share it with others online, you have a few options:</p>
+
+                    <div>
+                        <h4 class="font-semibold text-blue-600 mb-2">1. Host it on a Web Server (Recommended for Public Sharing)</h4>
+                        <p class="mb-1">This allows you to generate a public link that anyone can access.</p>
+                        <ul class="list-disc list-inside ml-4 text-sm space-y-1">
+                            <li>
+                                <p><strong>GitHub Pages (Free & Easy):</strong></p>
+                                <ol class="list-decimal list-inside ml-4">
+                                    <li>Create a new public GitHub repository.</li>
+                                    <li>Upload this `ml_roadmap.html` file to your repository (you might want to rename it to `index.html` for direct access).</li>
+                                    <li>Go to your repository's **Settings** tab, find **Pages** in the left sidebar, and enable it for your `main` branch.</li>
+                                    <li>Your roadmap will then be accessible via a public URL like `https://yourusername.github.io/your-repository-name/`.</li>
+                                </ol>
+                            </li>
+                            <li>
+                                <p><strong>Other Static Site Hosts (e.g., Netlify, Vercel):</strong></p>
+                                <p class="ml-4">These platforms offer drag-and-drop deployment for static sites and are also very straightforward.</p>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 class="font-semibold text-blue-600 mb-2">2. Share the File Directly</h4>
+                        <p class="mb-1">You can simply send the `ml_roadmap.html` file to others.</p>
+                        <ul class="list-disc list-inside ml-4 text-sm">
+                            <li>Via email attachments.</li>
+                            <li>Through cloud storage services (Google Drive, Dropbox, etc.).</li>
+                            <li>Using messaging apps that support file transfers.</li>
+                        </ul>
+                        <p class="mt-2 text-sm italic">Recipients can then open the file in their web browser.</p>
+                    </div>
+
+                    <p class="text-sm mt-4">Choose the method that best suits your needs!</p>
+                </div>
+            </div>
+        </div>
+
+
+        <footer class="text-center mt-12 py-4 border-t border-gray-200">
+            <p class="text-gray-500 text-sm">Interactive Roadmap Application</p>
+        </footer>
+    </div>
+
+    <script>
+        const roadmapData = {
+            month1: {
+                title: "Month 1: Fundamentals & Python Basics",
+                introduction: "The first month is crucial for building a solid foundation in programming, mathematics, and essential ML concepts.",
+                weeks: [
+                    {
+                        id: "week1",
+                        title: "Week 1: Python for Data Science & Version Control",
+                        goal: "Master Python basics, data structures, and get comfortable with Git for version control.",
+                        topics: [
+                            "Python syntax, variables, data types (lists, tuples, dictionaries, sets)",
+                            "Control flow (if/else, loops)",
+                            "Functions, modules, and packages",
+                            "Object-Oriented Programming (OOP) basics",
+                            "Introduction to Git and GitHub (cloning, committing, pushing, branching)"
+                        ],
+                        resources: [
+                            { text: "Corey Schafer - Python Basics Tutorials", url: "https://www.youtube.com/watch?v=YYXd_y_D_L8", isYoutube: true, videoId: "YYXd_y_D_L8", description: "A comprehensive introduction to Python programming, covering fundamental concepts like variables, data types, control flow, and functions." },
+                            { text: "Corey Schafer - Python OOP Tutorials", url: "https://www.youtube.com/watch?v=Z_Bh-L9_g_Y", isYoutube: true, videoId: "Z_Bh-L9_g_Y", description: "Learn Object-Oriented Programming in Python, starting with classes, instances, and class variables." },
+                            { text: "freeCodeCamp.org - Git and GitHub for Beginners - Crash Course", url: "https://www.youtube.com/watch?v=RGOj5yH7evk", isYoutube: true, videoId: "RGOj5yH7evk", description: "A complete crash course on Git version control and GitHub for collaborative coding." }
+                        ],
+                        exercise: "Solve 10-15 Python coding challenges on platforms like LeetCode (easy level) or HackerRank. Create a GitHub repository, commit your Python exercises, and push them. Make sure to create a new repository for each major project or week's exercises to keep your GitHub organized."
+                    },
+                    {
+                        id: "week2",
+                        title: "Week 2: Essential Math for ML (Linear Algebra & Calculus)",
+                        goal: "Understand the core mathematical concepts underpinning machine learning algorithms.",
+                        topics: [
+                            "Linear Algebra: Vectors, matrices, matrix operations (addition, multiplication), dot product, transpose, inverse, determinants, eigenvalues/eigenvectors (conceptual understanding).",
+                            "Calculus: Derivatives, partial derivatives, chain rule, gradient (conceptual understanding for optimization)."
+                        ],
+                        resources: [
+                           { text: "3Blue1Brown's Essence of Linear Algebra (Playlist)", url: "https://www.youtube.com/watch?v=fNk_zzaMoSs&list=PLZHQObGxqmI3XgVGY5EwR3zVFN_k7sB3j", isYoutube: true, videoId: "fNk_zzaMoSs", description: "Visual explanations of core linear algebra concepts like vectors, matrices, and transformations." },
+                           { text: "3Blue1Brown's Essence of Calculus (Playlist)", url: "https://www.youtube.com/watch?v=WUvTyaaNygM&list=PLZHQObGxqmI3YgQMjS4eWn-4Wb3p_b6kQ", isYoutube: true, videoId: "WUvTyaaNygM", description: "Intuitive understanding of calculus, including derivatives, integrals, and their applications." }
+                        ],
+                        exercise: "Work through examples of matrix operations manually. Practice calculating simple derivatives. Focus on understanding why these concepts are important for ML (e.g., gradient descent)."
+                    },
+                    {
+                        id: "week3",
+                        title: "Week 3: Statistics & Probability Fundamentals",
+                        goal: "Grasp the statistical and probabilistic concepts essential for data analysis and model understanding.",
+                        topics: [
+                            "Descriptive Statistics: Mean, median, mode, variance, standard deviation, quartiles, percentiles.",
+                            "Probability: Basic probability rules, conditional probability, Bayes' Theorem (conceptual).",
+                            "Distributions: Normal distribution, binomial distribution, Poisson distribution.",
+                            "Inferential Statistics (Introduction): Hypothesis testing, p-value (conceptual)."
+                        ],
+                        resources: [
+                            { text: "StatQuest with Josh Starmer - Statistics Fundamentals", url: "https://www.youtube.com/watch?v=hB9A4k0L7jQ&list=PLblh5JKNUPLiLVzM7Y7z_xH2S1Kj3Z_J7", isYoutube: true, videoId: "hB9A4k0L7jQ", description: "Clear explanations of essential statistical concepts like histograms, probability distributions, and hypothesis testing." }
+                        ],
+                        exercise: "Analyze a small dataset (e.g., a CSV file you create) and calculate descriptive statistics using Python (without libraries yet). Solve basic probability problems."
+                    },
+                    {
+                        id: "week4",
+                        title: "Week 4: Introduction to Machine Learning & Data Handling with Pandas",
+                        goal: "Get an overview of ML, understand the ML workflow, and learn to manipulate data with Pandas.",
+                        topics: [
+                            "What is Machine Learning? Supervised vs. Unsupervised Learning, Reinforcement Learning.",
+                            "Types of ML problems: Regression, Classification, Clustering.",
+                            "The ML Workflow: Data Collection, Preprocessing, Model Training, Evaluation, Deployment.",
+                            "Pandas (Detailed): Core Data Structures (DataFrame, Series), Reading/Writing Data, Data Inspection, Selection & Indexing, Handling Missing Data, Data Cleaning, Grouping & Aggregation, Merging & Joining, Applying Functions."
+                        ],
+                        resources: [
+                            { text: "Keith Galli - Complete Pandas Tutorial", url: "https://www.youtube.com/watch?v=vmEHCJofslg", isYoutube: true, videoId: "vmEHCJofslg", description: "A comprehensive tutorial on the Python Pandas library for data manipulation and analysis." },
+                            { text: "Simplilearn - What is Machine Learning?", url: "https://www.youtube.com/watch?v=f_uwKZIAeM0", isYoutube: true, videoId: "f_uwKZIAeM0", description: "An introduction to machine learning, covering its definition, types (supervised, unsupervised, reinforcement), and basic workflow." }
+                        ],
+                        exercise: "Download a simple dataset (e.g., Iris dataset, Boston Housing dataset from Kaggle). Use Pandas to load the data, inspect it, handle any missing values, and perform basic aggregations. Practice all the detailed Pandas operations mentioned."
+                    }
+                ]
+            },
+            month2: {
+                title: "Month 2: Core ML Concepts & Libraries",
+                introduction: "This month focuses on practical machine learning algorithms, data visualization, and model evaluation using popular Python libraries.",
+                weeks: [
+                    {
+                        id: "week5",
+                        title: "Week 5: NumPy & Matplotlib for Data Manipulation & Visualization",
+                        goal: "Master numerical operations with NumPy and create informative visualizations with Matplotlib.",
+                        topics: [
+                            "NumPy: Arrays, array operations, broadcasting, indexing, slicing, linear algebra functions.",
+                            "Matplotlib/Seaborn: Basic plots (scatter, line, bar, histogram), customizing plots, subplots, statistical plots."
+                        ],
+                        resources: [
+                            { text: "freeCodeCamp.org - Learn NumPy in 50 Minutes", url: "https://www.youtube.com/watch?v=QUT1Cyf_k8I", isYoutube: true, videoId: "QUT1Cyf_k8I", description: "A quick and practical guide to NumPy for numerical operations in Python." },
+                            { text: "freeCodeCamp.org - Matplotlib Tutorial - Python Data Visualization", url: "https://www.youtube.com/watch?v=F_fP1Q9b29k", isYoutube: true, videoId: "F_fP1Q9b29k", description: "Learn to create various plots and visualizations using Matplotlib in Python." }
+                        ],
+                        exercise: "Use NumPy to perform matrix operations. Create various plots of the dataset you used in Week 4 (histograms of features, scatter plots of features vs. target)."
+                    },
+                     {
+                        id: "week6",
+                        title: "Week 6: Supervised Learning - Regression",
+                        goal: "Understand and implement common regression algorithms.",
+                        topics: [
+                            "Linear Regression: Simple and Multiple Linear Regression, assumptions, interpretation of coefficients.",
+                            "Polynomial Regression: When to use it.",
+                            "Regularization: Ridge, Lasso, Elastic Net (L1/L2 regularization).",
+                            "Model Evaluation: Mean Squared Error (MSE), Root Mean Squared Error (RMSE), R-squared.",
+                            "Scikit-learn: LinearRegression, PolynomialFeatures, Ridge, Lasso."
+                        ],
+                        resources: [
+                            { text: "StatQuest with Josh Starmer - Linear Regression, Clearly Explained!!!", url: "https://www.youtube.com/watch?v=nk2CQ_L06z4", isYoutube: true, videoId: "nk2CQ_L06z4", description: "A clear explanation of linear regression, including fitting a line to data and understanding R-squared." },
+                            { text: "StatQuest with Josh Starmer - Ridge, Lasso and Elastic-Net Regression in R", url: "https://www.youtube.com/watch?v=Q8T_j3S_E9U", isYoutube: true, videoId: "Q8T_j3S_E9U", description: "Understand regularization techniques (Ridge, Lasso, Elastic Net) to prevent overfitting in regression models." }
+                        ],
+                        exercise: "Implement a Linear Regression model on a regression dataset. Split data, train, predict, evaluate. Experiment with regularization."
+                    },
+                    {
+                        id: "week7",
+                        title: "Week 7: Supervised Learning - Classification",
+                        goal: "Understand and implement common classification algorithms.",
+                        topics: [
+                            "Logistic Regression: Binary and Multi-class classification.",
+                            "Decision Trees: Concepts, Gini impurity, entropy.",
+                            "Support Vector Machines (SVMs): Linear and non-linear SVMs, kernels.",
+                            "K-Nearest Neighbors (KNN): Concepts.",
+                            "Model Evaluation: Accuracy, Precision, Recall, F1-score, Confusion Matrix, ROC Curve, AUC.",
+                            "Scikit-learn: LogisticRegression, DecisionTreeClassifier, SVC, KNeighborsClassifier."
+                        ],
+                        resources: [
+                            { text: "StatQuest with Josh Starmer - Logistic Regression", url: "https://www.youtube.com/watch?v=yIYfX42fW_c", isYoutube: true, videoId: "yIYfX42fW_c", description: "An intuitive explanation of logistic regression for classification problems." },
+                            { text: "StatQuest with Josh Starmer - Decision Trees, Clearly Explained!!!", url: "https://www.youtube.com/watch?v=7VeO_D5WJ8Y", isYoutube: true, videoId: "7VeO_D5WJ8Y", description: "Learn the fundamentals of decision trees for both classification and regression." },
+                            { text: "StatQuest with Josh Starmer - Support Vector Machines Part 1 (of 3): Main Ideas!!!", url: "https://www.youtube.com/watch?v=efR1C6CvgmQ", isYoutube: true, videoId: "efR1C6CvgmQ", description: "Introduction to Support Vector Machines, focusing on their core concepts for classification." }
+                        ],
+                        exercise: "Implement at least two classification models on a classification dataset. Evaluate using various metrics. Interpret the confusion matrix."
+                    },
+                    {
+                        id: "week8",
+                        title: "Week 8: Unsupervised Learning & Model Selection/Hyperparameter Tuning",
+                        goal: "Explore unsupervised learning techniques and learn how to select and tune models effectively.",
+                        topics: [
+                            "Clustering: K-Means, Hierarchical Clustering (conceptual).",
+                            "Dimensionality Reduction: Principal Component Analysis (PCA).",
+                            "Model Selection: Cross-validation (K-fold).",
+                            "Hyperparameter Tuning: Grid Search, Random Search.",
+                            "Pipelines: Scikit-learn pipelines for streamlining workflows."
+                        ],
+                        resources: [
+                            { text: "StatQuest with Josh Starmer - K-means clustering", url: "https://www.youtube.com/watch?v=4b5d3muQWMw", isYoutube: true, videoId: "4b5d3muQWMw", description: "A step-by-step guide to K-means clustering for grouping data points." },
+                            { text: "StatQuest with Josh Starmer - Principal Component Analysis (PCA), Step-by-Step", url: "https://www.youtube.com/watch?v=FgakZw6K1QQ", isYoutube: true, videoId: "FgakZw6K1QQ", description: "Understand Principal Component Analysis for dimensionality reduction." },
+                            { text: "Simplilearn - What is Cross-Validation In Machine Learning?", url: "https://www.youtube.com/watch?v=f_uwKZIAeM0", isYoutube: true, videoId: "f_uwKZIAeM0", description: "Learn about cross-validation techniques to evaluate machine learning models effectively." },
+                            { text: "Krish Naik - Hyperparameter Optimization - GridSearchCV and RandomizedSearchCV", url: "https://www.youtube.com/watch?v=y0gN4eHw0xQ", isYoutube: true, videoId: "y0gN4eHw0xQ", description: "Explore Grid Search and Random Search for hyperparameter tuning in machine learning models." }
+                        ],
+                        exercise: "Apply K-Means clustering and PCA. Use cross-validation and Grid Search for hyperparameter tuning. Build a Scikit-learn pipeline."
+                    }
+                ]
+            },
+            month3: {
+                title: "Month 3: Deep Learning & Advanced Topics",
+                introduction: "This month dives into the exciting world of deep learning, covering neural networks and specialized architectures, along with an introduction to MLOps.",
+                weeks: [
+                    {
+                        id: "week9",
+                        title: "Week 9: Introduction to Neural Networks & TensorFlow/PyTorch Basics",
+                        goal: "Understand the fundamentals of neural networks and get started with a deep learning framework.",
+                        topics: [
+                            "What are Neural Networks? Perceptrons, activation functions.",
+                            "Feedforward Neural Networks (Multilayer Perceptrons - MLPs).",
+                            "Backpropagation (conceptual understanding).",
+                            "Introduction to TensorFlow/Keras or PyTorch: Tensors, basic operations, building a simple MLP."
+                        ],
+                        resources: [
+                            { text: "3Blue1Brown - Neural Networks (Playlist)", url: "https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObGxqmIWa_KDNj0S1W8xKx_j5tq_G", isYoutube: true, videoId: "aircAruvnKk", description: "Visual explanations of how neural networks learn and function." },
+                            { text: "freeCodeCamp.org - TensorFlow 2.0 Complete Course - Python Neural Networks for Beginners", url: "https://www.youtube.com/watch?v=t_ZpA-NqP9M", isYoutube: true, videoId: "t_ZpA-NqP9M", description: "A comprehensive course on TensorFlow 2.0 for building and training neural networks." }
+                        ],
+                        exercise: "Build a simple MLP using TensorFlow/Keras or PyTorch to classify the Iris or MNIST dataset. Experiment with different activation functions."
+                    },
+                    {
+                        id: "week10",
+                        title: "Week 10: Convolutional Neural Networks (CNNs) for Computer Vision",
+                        goal: "Learn about CNNs and apply them to image-related tasks.",
+                        topics: [
+                            "Convolutional layers, pooling layers, fully connected layers.",
+                            "Common CNN architectures (e.g., LeNet, AlexNet, VGG - conceptual).",
+                            "Transfer Learning (conceptual).",
+                            "Image preprocessing for CNNs."
+                        ],
+                        resources: [
+                            { text: "StatQuest with Josh Starmer - Convolutional Neural Networks, Clearly Explained!!!", url: "https://www.youtube.com/watch?v=aircAruvnKk", isYoutube: true, videoId: "aircAruvnKk", description: "An in-depth explanation of Convolutional Neural Networks for computer vision tasks." }
+                        ],
+                        exercise: "Build a CNN using TensorFlow/Keras or PyTorch to classify images (e.g., Fashion MNIST, CIFAR-10). Experiment with layers and filters."
+                    },
+                    {
+                        id: "week11",
+                        title: "Week 11: Recurrent Neural Networks (RNNs) for Sequence Data & NLP Basics",
+                        goal: "Understand RNNs and their application to sequence data, with an introduction to Natural Language Processing.",
+                        topics: [
+                            "Recurrent Neural Networks (RNNs), vanishing/exploding gradients.",
+                            "Long Short-Term Memory (LSTM) and Gated Recurrent Unit (GRU) networks.",
+                            "Natural Language Processing (NLP) Basics: Text preprocessing (tokenization, stemming, lemmatization), Word Embeddings (Word2Vec, GloVe - conceptual)."
+                        ],
+                        resources: [
+                            { text: "StatQuest with Josh Starmer - Long Short-Term Memory (LSTM), Clearly Explained!!!", url: "https://www.youtube.com/watch?v=iX5V1WpxxSs", isYoutube: true, videoId: "iX5V1WpxxSs", description: "Understand the architecture and functionality of Long Short-Term Memory (LSTM) networks for sequence data." },
+                            { text: "freeCodeCamp.org - Natural Language Processing (NLP) Tutorial with Python & NLTK", url: "https://www.youtube.com/watch?v=X2PHjH_g140", isYoutube: true, videoId: "X2PHjH_g140", description: "An introductory course to Natural Language Processing using Python and NLTK." }
+                        ],
+                        exercise: "Build an LSTM or GRU model for a sequence prediction task. Perform basic text preprocessing."
+                    },
+                    {
+                        id: "week12",
+                        title: "Week 12: Introduction to MLOps & Deployment Concepts",
+                        goal: "Understand the lifecycle of ML models in production and basic deployment strategies.",
+                        topics: [
+                            "MLOps Concepts: Data Versioning, Model Versioning, Experiment Tracking, Model Monitoring.",
+                            "Deployment: REST APIs (Flask/FastAPI), Docker for containerization (conceptual), cloud platforms (AWS Sagemaker, Google AI Platform, Azure ML - conceptual overview).",
+                            "Ethical considerations in ML."
+                        ],
+                        resources: [
+                            { text: "Google Cloud Tech - What is MLOps?", url: "https://www.youtube.com/watch?v=06-AZXmwHjo", isYoutube: true, videoId: "06-AZXmwHjo", description: "An overview of MLOps concepts, practices, and its importance in managing the ML lifecycle." },
+                            { text: "freeCodeCamp.org - Docker Tutorial for Beginners", url: "https://www.youtube.com/watch?v=fqM6-t-xJjo", isYoutube: true, videoId: "fqM6-t-xJjo", description: "A beginner-friendly tutorial on Docker for containerization." },
+                            { text: "Corey Schafer - Python Flask Tutorial: Full-Featured Web App Part 1 - Setup and Hello World", url: "https://www.youtube.com/watch?v=MwZz_j7bQ0k", isYoutube: true, videoId: "MwZz_j7bQ0k", description: "Learn to build web applications using the Flask microframework in Python." }
+                        ],
+                        exercise: "Build a simple Flask/FastAPI application for predictions. (Optional) Containerize with Docker."
+                    }
+                ]
+            },
+            month4: {
+                title: "Month 4: Projects, Portfolio & Job Landing",
+                introduction: "This final month is dedicated to solidifying your skills through projects, building a compelling portfolio, and actively pursuing job opportunities.",
+                weeks: [
+                    {
+                        id: "week13",
+                        title: "Week 13: End-to-End Project 1 (Focus: Supervised Learning)",
+                        goal: "Complete a substantial end-to-end project, showcasing your supervised learning skills.",
+                        topics: ["Problem Definition", "Data Collection/Loading", "Exploratory Data Analysis (EDA)", "Data Preprocessing", "Feature Engineering", "Model Training", "Model Evaluation", "Hyperparameter Tuning", "Conclusion & Insights"],
+                        resources: [{text: "Kaggle Datasets", url:"https://www.kaggle.com/datasets", isYoutube: false, description: "A platform for data science competitions and datasets for machine learning."}],
+                        exercise: "Choose a real-world dataset for regression or classification. Follow all project steps. Document in a Jupyter Notebook. Push to GitHub. Aim for a project that solves a practical problem."
+                    },
+                    {
+                        id: "week14",
+                        title: "Week 14: End-to-End Project 2 (Focus: Deep Learning or Unsupervised Learning)",
+                        goal: "Complete a second substantial end-to-end project, showcasing your deep learning or unsupervised learning skills.",
+                        topics: ["Similar steps as Project 1, focusing on CNN, RNN/NLP, or Clustering/Dimensionality Reduction."],
+                        resources: [{text: "TensorFlow Datasets", url:"https://www.tensorflow.org/datasets", isYoutube: false, description: "A large collection of public datasets ready for use with TensorFlow and other ML frameworks."}],
+                        exercise: "Choose a project involving images, text, or unsupervised tasks. Examples: Image classification, sentiment analysis, customer segmentation. Push to GitHub. Make this project different from the first."
+                    },
+                    {
+                        id: "week15",
+                        title: "Week 15: Portfolio Building & Resume/LinkedIn Optimization",
+                        goal: "Create a professional online presence to showcase your skills and projects.",
+                        topics: ["Portfolio Website (GitHub Pages, Streamlit)", "Resume Tailoring for ML Roles", "LinkedIn Profile Optimization"],
+                        resources: [{text: "GitHub Pages", url:"https://pages.github.com/", isYoutube: false, description: "Host simple websites directly from your GitHub repository for free."}],
+                        exercise: "Build a portfolio website. Each project should have a description, findings, and GitHub link. Optimize your resume and LinkedIn. Get feedback."
+                    },
+                    {
+                        id: "week16",
+                        title: "Week 16: Interview Preparation & Job Application",
+                        goal: "Prepare for technical interviews and actively apply for jobs.",
+                        topics: ["Coding Practice (LeetCode)", "ML Concepts Review", "System Design Basics", "Behavioral Questions"],
+                        resources: [
+                            { text: "NeetCode - LeetCode Roadmap", url: "https://www.youtube.com/watch?v=pkYVpX7bQ7g", isYoutube: true, videoId: "pkYVpX7bQ7g", description: "A structured roadmap for tackling LeetCode problems to prepare for coding interviews." },
+                            { text: "StrataScratch - Data Science Interview Questions", url: "https://www.youtube.com/watch?v=aGj7t04S1wA", isYoutube: true, videoId: "aGj7t04S1wA", description: "Covers common data science and machine learning interview questions, including SQL and Python." }
+                        ],
+                        exercise: "Practice coding problems. Review ML concepts. Prepare for behavioral questions. Start applying for jobs. Network. Don't get discouraged by rejections."
+                    }
+                ]
+            },
+            tips: {
+                title: "General Tips for Success",
+                introduction: "Follow these general tips to maximize your learning and job prospects.",
+                points: [
+                    "Consistency is Key: Stick to your schedule. Short, consistent study sessions are effective.",
+                    "Active Learning: Implement, experiment, debug, and explain concepts in your own words.",
+                    "Understand the \"Why\": Grasp the intuition and reasoning behind algorithms.",
+                    "Join a Community: Engage online (Reddit r/MachineLearning, Kaggle forums, Discord).",
+                    "Kaggle: Participate in competitions for real-world problem-solving experience.",
+                    "SQL: Basic SQL skills are highly valuable. Try to practice.",
+                    "Cloud Basics: Familiarize yourself with one cloud provider (AWS, GCP, or Azure).",
+                    "Stay Curious: The field of ML is constantly evolving. Keep learning.",
+                    "Prioritize: Focus on core concepts and skills for entry-level roles."
+                ]
+            }
+        };
+
+        const contentArea = document.getElementById('roadmap-content');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const scrollToTopBtn = document.getElementById('scroll-to-top');
+
+        const explanationModal = document.getElementById('explanationModal');
+        const closeModalBtn = document.querySelector('.close-button');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalExplanationContent = document.getElementById('modalExplanationContent');
+
+        const videoModal = document.getElementById('videoModal');
+        const closeVideoModalBtn = document.getElementById('closeVideoModal');
+        const youtubePlayer = document.getElementById('youtubePlayer');
+
+        const shareAppBtn = document.getElementById('shareAppBtn');
+        const shareModal = document.getElementById('shareModal');
+        const closeShareModalBtn = document.getElementById('closeShareModal');
+
+
+        function saveCompletionStatus(weekId, exerciseIndex, isCompleted) {
+            let status = JSON.parse(localStorage.getItem('roadmapCompletion') || '{}');
+            if (!status[weekId]) {
+                status[weekId] = {};
+            }
+            status[weekId][exerciseIndex] = isCompleted;
+            localStorage.setItem('roadmapCompletion', JSON.stringify(status));
+        }
+
+        function getCompletionStatus(weekId, exerciseIndex) {
+            const status = JSON.parse(localStorage.getItem('roadmapCompletion') || '{}');
+            return status[weekId] ? status[weekId][exerciseIndex] || false : false;
+        }
+
+        async function getGeminiExplanation(topics) {
+            modalExplanationContent.innerHTML = '<p class="llm-loading">Generating explanation...</p>';
+            explanationModal.classList.remove('hidden');
+
+            const prompt = `Explain the following machine learning topics in a concise and easy-to-understand manner, suitable for someone learning to become an ML engineer. Focus on the core concepts and their relevance: ${topics.join(', ')}.`;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            const payload = { contents: chatHistory };
+            // IMPORTANT: The API key for Gemini will be provided by Canvas at runtime.
+            // For local testing, you might need to set it up yourself if not provided externally.
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    modalExplanationContent.innerHTML = `<p>${text.replace(/\n/g, '<br>')}</p>`; // Preserve newlines
+                } else {
+                    modalExplanationContent.innerHTML = '<p class="text-red-600">Error: Could not retrieve explanation. Please try again.</p>';
+                    console.error("Gemini API response structure unexpected:", result);
+                }
+            } catch (error) {
+                modalExplanationContent.innerHTML = '<p class="text-red-600">Error: Failed to connect to the explanation service. Check your network or try again later.</p>';
+                console.error("Error calling Gemini API:", error);
+            }
+        }
+
+        function renderWeek(week) {
+            let resourcesHtml = week.resources.map(res => {
+                let resourceContent = '';
+                // Add short definition/description before the resource link/thumbnail
+                if (res.description) {
+                    resourceContent += `<p class="text-gray-600 text-sm mb-1">${res.description}</p>`;
+                }
+
+                if (res.isYoutube) {
+                    const thumbnailUrl = `https://img.youtube.com/vi/${res.videoId}/hqdefault.jpg`; // High quality default thumbnail
+                    resourceContent += `
+                        <div class="video-thumbnail-container play-video-btn" data-video-id="${res.videoId}" title="Play ${res.text}">
+                            <img src="${thumbnailUrl}" alt="Thumbnail for ${res.text}">
+                            <span class="video-play-icon">▶</span>
+                        </div>
+                        <a href="${res.url}" target="_blank" rel="noopener noreferrer" class="block mt-1 text-blue-500 hover:underline">${res.text}</a>
+                    `;
+                } else {
+                    resourceContent += `
+                        <a href="${res.url}" target="_blank" rel="noopener noreferrer" class="block text-blue-500 hover:underline">${res.text}</a>
+                    `;
+                }
+                return `<li>${resourceContent}</li>`;
+            }).join('');
+
+            const isCompleted = getCompletionStatus(week.id, 0); // Assuming one exercise per week for simplicity
+            const checkedAttribute = isCompleted ? 'checked' : '';
+
+            return `
+                <div class="mb-4">
+                    <div class="week-header flex items-center justify-between p-4 bg-gray-100 rounded-lg shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold text-blue-700">${week.title}</h3>
+                        <span class="arrow-icon text-gray-500 text-xl">▶</span>
+                    </div>
+                    <div class="week-content p-4 bg-white rounded-b-lg border border-t-0 border-gray-200">
+                        <h4 class="font-medium text-gray-700 mt-2">Goal:</h4>
+                        <p class="mb-3 text-gray-600">${week.goal}</p>
+                        <h4 class="font-medium text-gray-700">Topics:</h4>
+                        <ul class="list-disc list-inside mb-3 text-gray-600 pl-4">
+                            ${week.topics.map(topic => `<li>${topic}</li>`).join('')}
+                        </ul>
+                        <button class="explain-more-btn bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors duration-200 mb-3" data-topics="${week.topics.join(';')}" data-week-title="${week.title}">
+                            ✨ Explain More
+                        </button>
+                        <h4 class="font-medium text-gray-700">Resources:</h4>
+                        <ul class="list-disc list-inside mb-3 text-gray-600 pl-4">
+                            ${resourcesHtml}
+                        </ul>
+                        <h4 class="font-medium text-gray-700">Practical Exercise:</h4>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="exercise-${week.id}" class="form-checkbox h-5 w-5 text-blue-600 rounded" ${checkedAttribute} data-week-id="${week.id}" data-exercise-index="0">
+                            <label for="exercise-${week.id}" class="ml-2 text-gray-600">${week.exercise}</label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderContent(tabKey) {
+            const data = roadmapData[tabKey];
+            let html = `<h2 class="text-2xl font-bold text-blue-800 mb-4">${data.title}</h2>`;
+            if (data.introduction) {
+                html += `<p class="mb-6 text-gray-700">${data.introduction}</p>`;
+            }
+
+            if (data.weeks) {
+                data.weeks.forEach(week => {
+                    html += renderWeek(week);
+                });
+            } else if (data.points) { // For General Tips
+                html += `<ul class="list-disc list-inside text-gray-700 pl-4 space-y-2">`;
+                data.points.forEach(point => {
+                    html += `<li>${point}</li>`;
+                });
+                html += `</ul>`;
+            }
+            contentArea.innerHTML = html;
+            contentArea.classList.add('active');
+
+            // Add event listeners for new elements
+            document.querySelectorAll('.week-header').forEach(header => {
+                header.addEventListener('click', (event) => {
+                    const content = header.nextElementSibling;
+                    const arrow = header.querySelector('.arrow-icon');
+                    if (content.classList.contains('expanded')) {
+                        content.classList.remove('expanded');
+                        arrow.classList.remove('rotated');
+                    } else {
+                        document.querySelectorAll('.week-content.expanded').forEach(expandedContent => {
+                            expandedContent.classList.remove('expanded');
+                            expandedContent.previousElementSibling.querySelector('.arrow-icon').classList.remove('rotated');
+                        });
+                        content.classList.add('expanded');
+                        arrow.classList.add('rotated');
+                    }
+                });
+            });
+
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', (event) => {
+                    const weekId = event.target.dataset.weekId;
+                    const exerciseIndex = parseInt(event.target.dataset.exerciseIndex);
+                    saveCompletionStatus(weekId, exerciseIndex, event.target.checked);
+                });
+            });
+
+            document.querySelectorAll('.explain-more-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const topicsString = event.target.dataset.topics;
+                    const weekTitle = event.target.dataset.weekTitle;
+                    const topicsArray = topicsString.split(';');
+                    modalTitle.textContent = `Explanation for ${weekTitle}`;
+                    getGeminiExplanation(topicsArray);
+                });
+            });
+
+            document.querySelectorAll('.play-video-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const videoId = event.currentTarget.dataset.videoId;
+                    youtubePlayer.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+                    videoModal.classList.remove('hidden');
+                });
+            });
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                navLinks.forEach(nav => nav.classList.remove('active'));
+                link.classList.add('active');
+                const tabKey = link.getAttribute('data-tab');
+                renderContent(tabKey);
+            });
+        });
+
+        // Modal close functionality for LLM explanation
+        closeModalBtn.addEventListener('click', () => {
+            explanationModal.classList.add('hidden');
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == explanationModal) {
+                explanationModal.classList.add('hidden');
+            }
+        });
+
+        // Modal close functionality for video playback
+        closeVideoModalBtn.addEventListener('click', () => {
+            youtubePlayer.src = ""; // Stop the video
+            videoModal.classList.add('hidden');
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == videoModal) {
+                youtubePlayer.src = ""; // Stop the video
+                videoModal.classList.add('hidden');
+            }
+        });
+
+        // Share button and modal functionality
+        shareAppBtn.addEventListener('click', () => {
+            shareModal.classList.remove('hidden');
+        });
+
+        closeShareModalBtn.addEventListener('click', () => {
+            shareModal.classList.add('hidden');
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == shareModal) {
+                shareModal.classList.add('hidden');
+            }
+        });
+
+        // Scroll to Top functionality
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollToTopBtn.style.display = 'block';
+            } else {
+                scrollToTopBtn.style.display = 'none';
+            }
+        });
+
+        scrollToTopBtn.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+
+        // Initial render
+        renderContent('month1');
+
+    </script>
+</body>
+</html>
